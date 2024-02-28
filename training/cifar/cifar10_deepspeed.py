@@ -22,7 +22,7 @@ def add_argument():
         help="number of total epochs (default: 30)",
     )
     parser.add_argument(
-        "--local_rank",
+        "--local_rank",  #?
         type=int,
         default=-1,
         help="local rank passed from distributed launcher",
@@ -53,6 +53,8 @@ def add_argument():
     )
 
     # For MoE (Mixture of Experts).
+    # Dia: Come back if time allows.
+    # Dia: Mixture of experts (MoE) is a machine learning technique where multiple expert networks (learners) are used to divide a problem space into homogeneous regions.
     parser.add_argument(
         "--moe",
         default=False,
@@ -110,7 +112,7 @@ def add_argument():
 def create_moe_param_groups(model):
     """Create separate parameter groups for each expert."""
     parameters = {"params": [p for p in model.parameters()], "name": "parameters"}
-    return split_params_into_different_moe_groups_for_optimizer(parameters)
+    return split_params_into_different_moe_groups_for_optimizer(parameters)  #? What optimizer?
 
 
 def get_ds_config(args):
