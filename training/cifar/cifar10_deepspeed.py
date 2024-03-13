@@ -22,10 +22,13 @@ def add_argument():
         help="number of total epochs (default: 30)",
     )
     parser.add_argument(
-        "--local_rank",  #?
+        # Local Rank
+        # Dia: for testing.
+        # Dia: local rank is a process id with respect to a given node. (https://medium.com/red-buffer/getting-started-with-pytorch-distributed-54ae933bb9f0)
+        "--local_rank",
         type=int,
-        default=-1,
-        help="local rank passed from distributed launcher",
+        default=-1,  # single-GPU training
+        help="local rank passed from distributed launcher",  #? What is launcher?
     )
     parser.add_argument(
         "--log-interval",
@@ -39,7 +42,7 @@ def add_argument():
         "--dtype",
         default="fp16",
         type=str,
-        choices=["bf16", "fp16", "fp32"],
+        choices=["bf16", "fp16", "fp32"],  # Dia: https://moocaholic.medium.com/fp64-fp32-fp16-bfloat16-tf32-and-other-members-of-the-zoo-a1ca7897d407 
         help="Datatype used for training",
     )
 
@@ -112,7 +115,7 @@ def add_argument():
 def create_moe_param_groups(model):
     """Create separate parameter groups for each expert."""
     parameters = {"params": [p for p in model.parameters()], "name": "parameters"}
-    return split_params_into_different_moe_groups_for_optimizer(parameters)  #? What optimizer?
+    return split_params_into_different_moe_groups_for_optimizer(parameters)
 
 
 def get_ds_config(args):
@@ -237,7 +240,7 @@ def test(model_engine, testset, local_device, target_dtype, test_batch_size=4):
 
     # Define the test dataloader.
     testloader = torch.utils.data.DataLoader(
-        testset, batch_size=test_batch_size, shuffle=False, num_workers=0
+        testset, batch_size=test_batch_size, shuffle=False, num_workers=0  # Dia: num_worker 0 means that the data will be loaded in the main process.
     )
 
     # For total accuracy.
@@ -248,25 +251,26 @@ def test(model_engine, testset, local_device, target_dtype, test_batch_size=4):
 
     # Start testing.
     model_engine.eval()
-    with torch.no_grad():
+    # temporarily disables gradient calculation during a specific block of code.
+    with torch.no_grad(): 
         for data in testloader:
             images, labels = data
             if target_dtype != None:
                 images = images.to(target_dtype)
             outputs = model_engine(images.to(local_device))
-            _, predicted = torch.max(outputs.data, 1)
+            _, predicted = torch.max(outputs.data, 1)  # Dia: select max values of each row. return tensor(values, induces)
             # Count the total accuracy.
             total += labels.size(0)
             correct += (predicted == labels.to(local_device)).sum().item()
 
             # Count the accuracy per class.
-            batch_correct = (predicted == labels.to(local_device)).squeeze()
+            batch_correct = (predicted == labels.to(local_device)).squeeze()  # numpy.squeeze(a, axis=None): Remove axes of length one from a.
             for i in range(test_batch_size):
                 label = labels[i]
                 class_correct[label] += batch_correct[i].item()
                 class_total[label] += 1
 
-    if model_engine.local_rank == 0:
+    if model_engine.local_rank == 0:  #? Why only local_rank == 0, testing?
         print(
             f"Accuracy of the network on the {total} test images: {100 * correct / total : .0f} %"
         )
@@ -286,19 +290,19 @@ def main(args):
     # Step1. Data Preparation.
     #
     # The output of torchvision datasets are PILImage images of range [0, 1].
-    # We transform them to Tensors of normalized range [-1, 1].
+    # We transform them to Tensors of normalized range [-1, 1].  # Dia: common preprocessing step
     #
     # Note:
     #     If running on Windows and you get a BrokenPipeError, try setting
     #     the num_worker of torch.utils.data.DataLoader() to 0.
     ########################################################################
     transform = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+        [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]  # Dia: Subtract the mean value and divide the standard deviation.s
     )
 
-    if torch.distributed.get_rank() != 0:
-        # Might be downloading cifar data, let rank 0 download first.
-        torch.distributed.barrier()
+    if torch.distributed.get_rank() != 0:  
+        # Might be downloading cifar data, let rank 0 download first.  #? Why
+        torch.distributed.barrier()  # a process is blocked by a barrier until all processes have encountered a barrier, upon which those barriers are lifted for all processes.
 
     # Load or download cifar data.
     trainset = torchvision.datasets.CIFAR10(
@@ -308,7 +312,7 @@ def main(args):
         root="./data", train=False, download=True, transform=transform
     )
 
-    if torch.distributed.get_rank() == 0:
+    if torch.distributed.get_rank() == 0:  #? Why two times
         # Cifar data is downloaded, indicate other ranks can proceed.
         torch.distributed.barrier()
 
@@ -367,21 +371,23 @@ def main(args):
         running_loss = 0.0
         for i, data in enumerate(trainloader):
             # Get the inputs. ``data`` is a list of [inputs, labels].
-            inputs, labels = data[0].to(local_device), data[1].to(local_device)
+            inputs, labels = data[0].to(local_device), data[1].to(local_device)  # Move the data to GPU.
 
             # Try to convert to target_dtype if needed.
             if target_dtype != None:
                 inputs = inputs.to(target_dtype)
 
-            outputs = model_engine(inputs)
+            outputs = model_engine(inputs)  #? Why sometimes loss = model_engine(batch)
             loss = criterion(outputs, labels)
 
+            # runs backpropagation
             model_engine.backward(loss)
+            # weight update
             model_engine.step()
 
             # Print statistics
             running_loss += loss.item()
-            if local_rank == 0 and i % args.log_interval == (
+            if local_rank == 0 and i % args.log_interval == (  #? why only when local_rank = 0
                 args.log_interval - 1
             ):  # Print every log_interval mini-batches.
                 print(
