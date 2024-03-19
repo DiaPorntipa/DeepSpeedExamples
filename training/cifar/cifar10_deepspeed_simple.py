@@ -1,3 +1,5 @@
+# Dia: checkpointing and Tensorboard visualisation are missed here.
+# Set GPU using bash command. see https://www.deepspeed.ai/getting-started/ 
 import argparse
 
 import deepspeed
@@ -97,14 +99,14 @@ def get_ds_config(args):
             "initial_scale_power": 15,
         },
         "wall_clock_breakdown": False,
-        "zero_optimization": {
+        "zero_optimization": {  # Dia: see tutorial here https://www.deepspeed.ai/docs/config-json/#zero-optimizations-for-fp16-training 
             "stage": args.stage,
-            "allgather_partitions": True,
-            "reduce_scatter": True,
+            "allgather_partitions": True,  # Dia: for parameters  # Dia: see https://en.wikipedia.org/wiki/Collective_operation for collective operations.
+            "reduce_scatter": True,  # Dia: for gradients  # Dia: ? True only for stage 2, 3
             "allgather_bucket_size": 50000000,
             "reduce_bucket_size": 50000000,
-            "overlap_comm": True,
-            "contiguous_gradients": True,
+            "overlap_comm": True,  # Dia: ? Attempts to overlap the reduction of the gradients with backward computation
+            "contiguous_gradients": True, # Dia: copy gradients to contiguous buffer to avoid memory becomes fragmented due to the allocation and deallocation of memory during the backward propagation of gradients.
             "cpu_offload": False,
         },
     }
@@ -230,7 +232,7 @@ def main(args):
         root="./data", train=False, download=True, transform=transform
     )
 
-    if torch.distributed.get_rank() == 0:  #? Why two times
+    if torch.distributed.get_rank() == 0:  
         # Cifar data is downloaded, indicate other ranks can proceed.
         torch.distributed.barrier()
 
@@ -291,7 +293,7 @@ def main(args):
             if target_dtype != None:
                 inputs = inputs.to(target_dtype)
 
-            outputs = model_engine(inputs)  #? Why sometimes loss = model_engine(batch)
+            outputs = model_engine(inputs)  # Dia: the engine produces loss when the loss_funtion is set during deepspeed intialize step.
             loss = criterion(outputs, labels)
 
             # runs backpropagation
@@ -301,7 +303,7 @@ def main(args):
 
             # Print statistics
             running_loss += loss.item()
-            if local_rank == 0 and i % args.log_interval == (  #? why only when local_rank = 0
+            if local_rank == 0 and i % args.log_interval == (  # Dia: only when local_rank = 0 or else there are going to be replicates of the same logs.
                 args.log_interval - 1
             ):  # Print every log_interval mini-batches.
                 print(
