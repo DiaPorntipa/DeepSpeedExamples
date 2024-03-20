@@ -1,0 +1,54 @@
+
+-------------------------- DeepSpeed Flops Profiler --------------------------
+Profile Summary at step 2:
+Notations:
+data parallel size (dp_size), model parallel size(mp_size),
+number of parameters (params), number of multiply-accumulate operations(MACs),
+number of floating-point operations (flops), floating-point operations per second (FLOPS),
+fwd latency (forward propagation latency), bwd latency (backward propagation latency),
+step (weights update latency), iter latency (sum of fwd, bwd and step latency)
+
+world size:                                                             2       
+data parallel size:                                                     2       
+model parallel size:                                                    1       
+batch size per GPU:                                                     8       
+params per GPU:                                                         62.01 K 
+params of model = params per GPU * mp_size:                             62.01 K 
+fwd MACs per GPU:                                                       5.21 MMACs
+fwd flops per GPU:                                                      10.58 M 
+fwd flops of model = fwd flops per GPU * mp_size:                       10.58 M 
+fwd latency:                                                            5.63 ms 
+fwd FLOPS per GPU = fwd flops per GPU / fwd latency:                    1.88 GFLOPS
+bwd latency:                                                            10.35 ms
+bwd FLOPS per GPU = 2 * fwd flops per GPU / bwd latency:                2.04 GFLOPS
+fwd+bwd FLOPS per GPU = 3 * fwd flops per GPU / (fwd+bwd latency):      1.99 GFLOPS
+step latency:                                                           5.13 ms 
+iter latency:                                                           21.11 ms
+FLOPS per GPU = 3 * fwd flops per GPU / iter latency:                   1.5 GFLOPS
+samples/second:                                                         757.87  
+
+----------------------------- Aggregated Profile per GPU -----------------------------
+Top 1 modules in terms of params, MACs or fwd latency at different model depths:
+depth 0:
+    params      - {'Net': '62.01 K'}
+    MACs        - {'Net': '5.21 MMACs'}
+    fwd latency - {'Net': '5.18 ms'}
+
+------------------------------ Detailed Profile per GPU ------------------------------
+Each module profile is listed after its name in the following order: 
+params, percentage of total params, MACs, percentage of total MACs, fwd latency, percentage of total fwd latency, fwd FLOPS
+
+Note: 1. A module can have torch.nn.module or torch.nn.functional to compute logits (e.g. CrossEntropyLoss). They are not counted as submodules, thus not to be printed out. However they make up the difference between a parent's MACs (or latency) and the sum of its submodules'.
+2. Number of floating-point operations is a theoretical estimation, thus FLOPS computed using that could be larger than the maximum system throughput.
+3. The fwd latency listed in the top module's profile is directly captured at the module forward function in PyTorch, thus it's less than the fwd latency shown above which is captured in DeepSpeed.
+
+Net(
+  62.01 K = 100% Params, 5.21 MMACs = 100% MACs, 5.18 ms = 100% latency, 2.04 GFLOPS
+  (conv1): Conv2d(456 = 0.74% Params, 2.82 MMACs = 54.13% MACs, 554.8 us = 10.71% latency, 10.24 GFLOPS, 3, 6, kernel_size=(5, 5), stride=(1, 1))
+  (pool): MaxPool2d(0 = 0% Params, 0 MACs = 0% MACs, 661.37 us = 12.77% latency, 76.25 MFLOPS, kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+  (conv2): Conv2d(2.42 K = 3.9% Params, 1.92 MMACs = 36.83% MACs, 437.02 us = 8.44% latency, 8.82 GFLOPS, 6, 16, kernel_size=(5, 5), stride=(1, 1))
+  (fc1): Linear(48.12 K = 77.61% Params, 384 KMACs = 7.37% MACs, 413.42 us = 7.98% latency, 1.86 GFLOPS, in_features=400, out_features=120, bias=True)
+  (fc2): Linear(10.16 K = 16.39% Params, 80.64 KMACs = 1.55% MACs, 549.55 us = 10.61% latency, 293.47 MFLOPS, in_features=120, out_features=84, bias=True)
+  (fc3): Linear(850 = 1.37% Params, 6.72 KMACs = 0.13% MACs, 383.38 us = 7.4% latency, 35.06 MFLOPS, in_features=84, out_features=10, bias=True)
+)
+------------------------------------------------------------------------------

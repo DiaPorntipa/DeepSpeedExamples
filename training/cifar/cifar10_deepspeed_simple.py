@@ -109,6 +109,14 @@ def get_ds_config(args):
             "contiguous_gradients": True, # Dia: copy gradients to contiguous buffer to avoid memory becomes fragmented due to the allocation and deallocation of memory during the backward propagation of gradients.
             "cpu_offload": False,
         },
+        "flops_profiler": {
+            "enabled": True,
+            "profile_step": 1,
+            "module_depth": -1,
+            "top_modules": 1,
+            "detailed": True,
+            "output_file": "profile.txt",
+        },
     }
     return ds_config
 
