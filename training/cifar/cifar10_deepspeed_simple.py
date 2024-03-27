@@ -102,14 +102,14 @@ def get_ds_config(args):
         "zero_optimization": {  # Dia: see tutorial here https://www.deepspeed.ai/docs/config-json/#zero-optimizations-for-fp16-training 
             "stage": args.stage,
             "allgather_partitions": True,  # Dia: for parameters  # Dia: see https://en.wikipedia.org/wiki/Collective_operation for collective operations.
-            "reduce_scatter": True,  # Dia: for gradients  # Dia: ? True only for stage 2, 3
+            "reduce_scatter": False,  # Dia: ? for gradient partitioning, suppose to reduce memory for stage 2 and 3
             "allgather_bucket_size": 50000000,
             "reduce_bucket_size": 50000000,
-            "overlap_comm": True,  # Dia: ? Attempts to overlap the reduction of the gradients with backward computation
-            "contiguous_gradients": True, # Dia: copy gradients to contiguous buffer to avoid memory becomes fragmented due to the allocation and deallocation of memory during the backward propagation of gradients.
+            "overlap_comm": False,  # Dia: ? Attempts to overlap the reduction of the gradients with backward computation
+            "contiguous_gradients": True,  # Dia: copy gradients to contiguous buffer to avoid memory becomes fragmented due to the allocation and deallocation of memory during the backward propagation of gradients.
             "cpu_offload": False,
         },
-        "flops_profiler": {
+        "flops_profiler": {  # Dia: Put this config to get profiler
             "enabled": True,
             "profile_step": 1,
             "module_depth": -1,
@@ -127,8 +127,10 @@ class Net(nn.Module):
         self.conv1 = nn.Conv2d(3, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 16, 5)
-        self.fc1 = nn.Linear(16 * 5 * 5, 120)
-        self.fc2 = nn.Linear(120, 84)
+        self.fc1 = nn.Linear(16 * 5 * 5, 1200)
+        test_layers = [nn.Linear(1200, 1200) for i in range(600)]
+        self.fusion_layer = nn.Sequential(*test_layers)
+        self.fc2 = nn.Linear(1200, 84)
         self.fc3 = nn.Linear(84, 10)
 
     def forward(self, x):
@@ -136,6 +138,7 @@ class Net(nn.Module):
         x = self.pool(F.relu(self.conv2(x)))
         x = x.view(-1, 16 * 5 * 5)
         x = F.relu(self.fc1(x))
+        x = F.relu(self.fusion_layer(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x

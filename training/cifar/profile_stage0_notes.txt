@@ -56,10 +56,3 @@ Net(
 Dia's Notes
 - MACs is the number of multiplication and addition operations performed by a neural network model during inference or training.
 - world size is the number of GPUs
-
-Questions
-- Why stage3 is not performing as it should be? Why model parallel size for stage3 is 1? Did I set any config worng?
-- Why the forward propogation latency keeps increasing with stage number? communication time?
-- Where to find GPU usage? or should I use nvidia-smi instead?￼Get access to the codebase.
-￼Ask for the important parts of the code.
-￼Review and understand the parts of the codebase. Make notes.
